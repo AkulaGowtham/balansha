@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Try On</title>
+    <style>
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 500px;
+            background-color: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 10px;
+        }
+        .modal-body {
+            margin-top: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid #e5e5e5;
+            padding-top: 10px;
+        }
+        .close-button {
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 1.2em;
+        }
+        #video {
+            display: none;
+            width: 100%;
+        }
+        .capture-button {
+            margin-top: 10px;
+            display: none;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Try On: {{ item.name }}</h1>
+
+    <button type="button" onclick="openModal()">Try On</button>
+
+    <div id="modal" class="modal">
+        <div class="modal-header">
+            <h2>Try On</h2>
+            <button class="close-button" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="try-on-form" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div>
+                    <button type="button" onclick="openCamera()">Open Camera</button>
+                    <input type="hidden" name="camera_image" id="camera_image">
+                </div>
+                
+                <div>
+                    <button type="submit" name="camera" value="true">Submit Camera Image</button>
+                </div>
+                
+                <div>
+                    <select name="avatar">
+                        <option value="avatar1">Avatar 1</option>
+                        <option value="avatar2">Avatar 2</option>
+                        <!-- Add more avatars as needed -->
+                    </select>
+                    <button type="submit" name="avatar" value="true">Submit Avatar Selection</button>
+                </div>
+            </form>
+
+            <video id="video" autoplay></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <button class="capture-button" id="capture-button">Capture Image</button>
+        </div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Functions to open and close the modal
+        function openModal() {
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        // Make the modal draggable
+        function dragElement(el) {
+            var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            el.onmousedown = function(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            };
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        dragElement(document.getElementById('modal'));
+
+        // Function to open the camera and capture an image
+        function openCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    
+                    const captureButton = document.getElementById('capture-button');
+                    captureButton.style.display = 'block';
+                    captureButton.onclick = function() {
+                        const canvas = document.getElementById('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        const dataUrl = canvas.toDataURL('image/png');
+                        document.getElementById('camera_image').value = dataUrl;
+                        
+                        stream.getTracks().forEach(track => track.stop());
+                        video.style.display = 'none';
+                        captureButton.style.display = 'none';
+
+                        // Automatically submit the form after capturing the image
+                        document.getElementById('try-on-form').submit();
+                    };
+                })
+                .catch(function(err) {
+                    console.error('Error accessing camera: ' + err);
+                    alert('Error accessing camera: ' + err);
+                });
+        }
+    </script>
+
+    {% if camera_image %}
+        <h2>Captured Image:</h2>
+        <img src="{{ camera_image }}" alt="Captured Image">
+    {% endif %}
+
+    {% if avatar_choice %}
+        <h2>Selected Avatar: {{ avatar_choice }}</h2>
+    {% endif %}
+</body>
+</html>
